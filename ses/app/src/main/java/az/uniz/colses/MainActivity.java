@@ -222,12 +222,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private short limitSample(float value) {
-        // Soft limiter: avoids severe digital clipping.
-        float limited = (float) Math.tanh(value / 28000f);
-        return (short) (limited * 30000f);
-    }
-
     private void play(int mode) {
         AudioTrack track = null;
         AudioRecord recorder = null;
@@ -306,7 +300,7 @@ public class MainActivity extends Activity {
             }
 
             // Maximum Android AudioTrack software volume.
-            track.setVolume(1.0f);
+            track.setVolume(0.75f);
 
             short[] stereo = new short[1920];
             short[] mono = new short[960];
@@ -338,7 +332,7 @@ public class MainActivity extends Activity {
                 );
 
                 recorder = new AudioRecord(
-                    MediaRecorder.AudioSource.MIC,
+                    MediaRecorder.AudioSource.VOICE_RECOGNITION,
                     RATE,
                     AudioFormat.CHANNEL_IN_MONO,
                     AudioFormat.ENCODING_PCM_16BIT,
@@ -444,11 +438,9 @@ public class MainActivity extends Activity {
                         short sample = 0;
 
                         if (i < n) {
-                            // Moderate microphone amplification
-                            // with digital limiting.
-                            sample = limitSample(
-                                mono[i] * 2.0f
-                            );
+                            // Natural microphone passthrough without
+                            // nonlinear limiting or artificial gain.
+                            sample = mono[i];
                         }
 
                         stereo[2 * i] = sample;
