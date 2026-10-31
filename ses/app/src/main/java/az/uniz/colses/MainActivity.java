@@ -59,9 +59,9 @@ public class MainActivity extends Activity {
         starts = new Button[4];
 
         String[] labels = {
-            "MİQALKA",
+            "POLİS TİPLİ",
+            "TƏCİLİ YARDIM TİPLİ",
             "SÜRƏTLİ MİQALKA",
-            "XƏBƏRDARLIQ",
             "CANLI DANIŞ"
         };
 
@@ -300,7 +300,7 @@ public class MainActivity extends Activity {
             }
 
             // Maximum Android AudioTrack software volume.
-            track.setVolume(0.75f);
+            track.setVolume(mode == 3 ? 0.75f : 1.0f);
 
             short[] stereo = new short[1920];
             short[] mono = new short[960];
@@ -452,36 +452,39 @@ public class MainActivity extends Activity {
                     for (int i = 0; i < 960; i++, frames++) {
                         double time = frames / (double) RATE;
 
-                        // Three original electronic alert patterns.
+                        // Rich electronic siren-style tones; not recordings.
                         double freq;
-                        double envelope = 1.0;
+                        double t = time;
                         if (mode == 0) {
-                            // Alternating two-tone alert.
-                            freq = ((int) (time / 0.35) % 2 == 0)
-                                ? 740.0 : 980.0;
+                            // Smooth rising and falling wail.
+                            double cycle = (t % 2.4) / 2.4;
+                            double sweep = 0.5 - 0.5 * Math.cos(2.0 * Math.PI * cycle);
+                            freq = 560.0 + 640.0 * sweep;
                         } else if (mode == 1) {
-                            // Fast rising/falling electronic sweep.
-                            double phase = (time % 0.5) / 0.5;
-                            freq = phase < 0.5
-                                ? 620.0 + 800.0 * phase
-                                : 1020.0 - 800.0 * (phase - 0.5);
+                            // Alternating two-tone electronic alert.
+                            freq = ((int)(t / 0.42) % 2 == 0) ? 660.0 : 880.0;
                         } else {
-                            // Three short pulses followed by a pause.
-                            double phase = time % 1.2;
-                            boolean on = phase < 0.15 ||
-                                (phase >= 0.25 && phase < 0.40) ||
-                                (phase >= 0.50 && phase < 0.65);
-                            envelope = on ? 1.0 : 0.0;
-                            freq = 860.0;
+                            // Rapid, smooth rising/falling electronic alert.
+                            double cycle = (t % 0.56) / 0.56;
+                            double sweep = 0.5 - 0.5 * Math.cos(2.0 * Math.PI * cycle);
+                            freq = 650.0 + 500.0 * sweep;
                         }
 
-                        // Integrate instantaneous frequency for smooth sweeps.
                         signalPhase += 2.0 * Math.PI * freq / RATE;
                         if (signalPhase >= 2.0 * Math.PI) {
                             signalPhase -= 2.0 * Math.PI;
                         }
-                        short sample = (short) (6000.0 * envelope *
-                            Math.sin(signalPhase));
+
+                        // Add harmonics for a fuller sound, avoiding clipping.
+                        double wave =
+                            Math.sin(signalPhase) +
+                            0.30 * Math.sin(2.0 * signalPhase) +
+                            0.12 * Math.sin(3.0 * signalPhase);
+                        double attack = Math.min(1.0, t / 0.08);
+                        double release = Math.min(1.0, (3.0 - t) / 0.10);
+                        double envelope = Math.max(0.0, Math.min(attack, release));
+                        short sample = (short)(21000.0 * envelope *
+                            Math.tanh(wave / 1.15));
 
                         stereo[2 * i] = sample;
                         stereo[2 * i + 1] = sample;
