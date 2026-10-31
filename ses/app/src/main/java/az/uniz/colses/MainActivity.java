@@ -7,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.media.*;
 import android.os.*;
 import android.util.Log;
+import android.view.*;
 import android.widget.*;
 
 public class MainActivity extends Activity {
@@ -15,8 +16,7 @@ public class MainActivity extends Activity {
     private static final String TAG = "UniZColSes";
     private static final int RATE = 48000;
 
-    private final Handler handler =
-        new Handler(Looper.getMainLooper());
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     private TextView status;
     private TextView micLevel;
@@ -59,9 +59,9 @@ public class MainActivity extends Activity {
         starts = new Button[4];
 
         String[] labels = {
-            "Qısa siqnal",
-            "İki siqnal",
-            "Xəbərdarlıq",
+            "MİQALKA",
+            "SÜRƏTLİ MİQALKA",
+            "XƏBƏRDARLIQ",
             "CANLI DANIŞ"
         };
 
@@ -85,9 +85,7 @@ public class MainActivity extends Activity {
         stop.setText("DAYANDIR");
         stop.setTextSize(23);
         stop.setBackgroundTintList(
-            android.content.res.ColorStateList.valueOf(
-                0xffa52d3b
-            )
+            android.content.res.ColorStateList.valueOf(0xffa52d3b)
         );
 
         layout.addView(
@@ -109,11 +107,11 @@ public class MainActivity extends Activity {
 
         setContentView(layout);
 
-        if (findBus() == null) {
+        AudioDeviceInfo device = findBus();
+
+        if (device == null) {
             status.setText("Çöl səs çıxışı tapılmadı.");
-            for (Button b : starts) {
-                b.setEnabled(false);
-            }
+            for (Button b : starts) b.setEnabled(false);
         } else {
             status.setText("Çöl səs çıxışı hazırdır.");
         }
@@ -150,8 +148,7 @@ public class MainActivity extends Activity {
                 " address=" + d.getAddress()
             );
 
-            if (d.getType() ==
-                AudioDeviceInfo.TYPE_BUILTIN_MIC) {
+            if (d.getType() == AudioDeviceInfo.TYPE_BUILTIN_MIC) {
                 return d;
             }
 
@@ -253,9 +250,7 @@ public class MainActivity extends Activity {
             )
                 .setAudioAttributes(attributes)
                 .setOnAudioFocusChangeListener(change -> {
-                    if (change < 0) {
-                        running = false;
-                    }
+                    if (change < 0) running = false;
                 })
                 .build();
 
@@ -292,8 +287,7 @@ public class MainActivity extends Activity {
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .build();
 
-            if (track.getState() !=
-                AudioTrack.STATE_INITIALIZED) {
+            if (track.getState() != AudioTrack.STATE_INITIALIZED) {
                 throw new IllegalStateException(
                     "Səs çıxışı açıla bilmədi."
                 );
@@ -305,15 +299,15 @@ public class MainActivity extends Activity {
                 );
             }
 
-            // Android proqram səviyyəsində maksimum səs.
-            track.setVolume(1.0f);
+            // Maximum Android AudioTrack software volume.
+            track.setVolume(0.75f);
 
             short[] stereo = new short[1920];
             short[] mono = new short[960];
 
             track.play();
 
-            // Çöl dinamik bağlantısını yoxla.
+            // Check the actual route before sending sound.
             for (int i = 0; i < 20 && running; i++) {
                 write(track, stereo);
             }
@@ -345,8 +339,8 @@ public class MainActivity extends Activity {
                     inputBuffer
                 );
 
-                if (recorder.getState() !=
-                    AudioRecord.STATE_INITIALIZED) {
+                if (recorder.getState()
+                    != AudioRecord.STATE_INITIALIZED) {
                     throw new IllegalStateException(
                         "Mikrofon açıla bilmədi."
                     );
@@ -366,8 +360,8 @@ public class MainActivity extends Activity {
 
                 recorder.startRecording();
 
-                if (recorder.getRecordingState() !=
-                    AudioRecord.RECORDSTATE_RECORDING) {
+                if (recorder.getRecordingState()
+                    != AudioRecord.RECORDSTATE_RECORDING) {
                     throw new IllegalStateException(
                         "Mikrofon yazmağa başlamadı."
                     );
@@ -390,6 +384,7 @@ public class MainActivity extends Activity {
             );
 
             long frames = 0;
+            double signalPhase = 0.0;
             int blocks = mode == 3 ? 1500 : 150;
 
             for (int block = 0;
@@ -444,14 +439,9 @@ public class MainActivity extends Activity {
                         short sample = 0;
 
                         if (i < n) {
-                            // Mikrofon səsini 3 dəfə gücləndir.
-                            // Daşmanın qarşısını al.
                             float boosted = mono[i] * 3.0f;
-
-                            sample = (short) Math.max(
-                                -32768,
-                                Math.min(32767, boosted)
-                            );
+                            sample = (short) Math.max(-32768,
+                                Math.min(32767, boosted));
                         }
 
                         stereo[2 * i] = sample;
@@ -462,42 +452,36 @@ public class MainActivity extends Activity {
                     for (int i = 0; i < 960; i++, frames++) {
                         double time = frames / (double) RATE;
 
-                        double phase = mode == 0
-                            ? time
-                            : time % (mode == 1 ? 1.2 : 0.6);
-
-                        boolean on;
-
+                        // Three original electronic alert patterns.
+                        double freq;
+                        double envelope = 1.0;
                         if (mode == 0) {
-                            on = time < 0.5;
+                            // Alternating two-tone alert.
+                            freq = ((int) (time / 0.35) % 2 == 0)
+                                ? 740.0 : 980.0;
                         } else if (mode == 1) {
-                            on = time < 1.2 &&
-                                (phase < 0.25 ||
-                                 (phase > 0.5 &&
-                                  phase < 0.75));
+                            // Fast rising/falling electronic sweep.
+                            double phase = (time % 0.5) / 0.5;
+                            freq = phase < 0.5
+                                ? 620.0 + 800.0 * phase
+                                : 1020.0 - 800.0 * (phase - 0.5);
                         } else {
-                            on = phase < 0.25;
+                            // Three short pulses followed by a pause.
+                            double phase = time % 1.2;
+                            boolean on = phase < 0.15 ||
+                                (phase >= 0.25 && phase < 0.40) ||
+                                (phase >= 0.50 && phase < 0.65);
+                            envelope = on ? 1.0 : 0.0;
+                            freq = 860.0;
                         }
 
-                        double envelope = Math.min(
-                            1,
-                            Math.min(
-                                (phase % 0.25) * 100,
-                                (0.25 - phase % 0.25) * 100
-                            )
-                        );
-
-                        short sample = (short) (
-                            on
-                                ? 7000 *
-                                  Math.max(0, envelope) *
-                                  Math.sin(
-                                      2 * Math.PI *
-                                      (mode == 2 ? 660 : 880) *
-                                      time
-                                  )
-                                : 0
-                        );
+                        // Integrate instantaneous frequency for smooth sweeps.
+                        signalPhase += 2.0 * Math.PI * freq / RATE;
+                        if (signalPhase >= 2.0 * Math.PI) {
+                            signalPhase -= 2.0 * Math.PI;
+                        }
+                        short sample = (short) (6000.0 * envelope *
+                            Math.sin(signalPhase));
 
                         stereo[2 * i] = sample;
                         stereo[2 * i + 1] = sample;
@@ -511,13 +495,14 @@ public class MainActivity extends Activity {
 
         } catch (Exception e) {
             Log.e(TAG, "Audio error", e);
+
             result = "XƏTA: " + e.getMessage();
 
         } finally {
             if (recorder != null) {
                 try {
-                    if (recorder.getRecordingState() ==
-                        AudioRecord.RECORDSTATE_RECORDING) {
+                    if (recorder.getRecordingState()
+                        == AudioRecord.RECORDSTATE_RECORDING) {
                         recorder.stop();
                     }
                 } catch (Exception ignored) {}
@@ -541,6 +526,7 @@ public class MainActivity extends Activity {
             }
 
             running = false;
+
             show(result);
 
             handler.post(() -> {
