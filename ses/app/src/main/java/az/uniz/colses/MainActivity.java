@@ -7,7 +7,6 @@ import android.content.pm.PackageManager;
 import android.media.*;
 import android.os.*;
 import android.util.Log;
-import android.view.*;
 import android.widget.*;
 
 public class MainActivity extends Activity {
@@ -16,7 +15,8 @@ public class MainActivity extends Activity {
     private static final String TAG = "UniZColSes";
     private static final int RATE = 48000;
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Handler handler =
+        new Handler(Looper.getMainLooper());
 
     private TextView status;
     private TextView micLevel;
@@ -85,7 +85,9 @@ public class MainActivity extends Activity {
         stop.setText("DAYANDIR");
         stop.setTextSize(23);
         stop.setBackgroundTintList(
-            android.content.res.ColorStateList.valueOf(0xffa52d3b)
+            android.content.res.ColorStateList.valueOf(
+                0xffa52d3b
+            )
         );
 
         layout.addView(
@@ -107,11 +109,11 @@ public class MainActivity extends Activity {
 
         setContentView(layout);
 
-        AudioDeviceInfo device = findBus();
-
-        if (device == null) {
+        if (findBus() == null) {
             status.setText("Çöl səs çıxışı tapılmadı.");
-            for (Button b : starts) b.setEnabled(false);
+            for (Button b : starts) {
+                b.setEnabled(false);
+            }
         } else {
             status.setText("Çöl səs çıxışı hazırdır.");
         }
@@ -148,7 +150,8 @@ public class MainActivity extends Activity {
                 " address=" + d.getAddress()
             );
 
-            if (d.getType() == AudioDeviceInfo.TYPE_BUILTIN_MIC) {
+            if (d.getType() ==
+                AudioDeviceInfo.TYPE_BUILTIN_MIC) {
                 return d;
             }
 
@@ -250,7 +253,9 @@ public class MainActivity extends Activity {
             )
                 .setAudioAttributes(attributes)
                 .setOnAudioFocusChangeListener(change -> {
-                    if (change < 0) running = false;
+                    if (change < 0) {
+                        running = false;
+                    }
                 })
                 .build();
 
@@ -287,7 +292,8 @@ public class MainActivity extends Activity {
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .build();
 
-            if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+            if (track.getState() !=
+                AudioTrack.STATE_INITIALIZED) {
                 throw new IllegalStateException(
                     "Səs çıxışı açıla bilmədi."
                 );
@@ -299,15 +305,15 @@ public class MainActivity extends Activity {
                 );
             }
 
-            // Maximum Android AudioTrack software volume.
-            track.setVolume(0.75f);
+            // Android proqram səviyyəsində maksimum səs.
+            track.setVolume(1.0f);
 
             short[] stereo = new short[1920];
             short[] mono = new short[960];
 
             track.play();
 
-            // Check the actual route before sending sound.
+            // Çöl dinamik bağlantısını yoxla.
             for (int i = 0; i < 20 && running; i++) {
                 write(track, stereo);
             }
@@ -339,8 +345,8 @@ public class MainActivity extends Activity {
                     inputBuffer
                 );
 
-                if (recorder.getState()
-                    != AudioRecord.STATE_INITIALIZED) {
+                if (recorder.getState() !=
+                    AudioRecord.STATE_INITIALIZED) {
                     throw new IllegalStateException(
                         "Mikrofon açıla bilmədi."
                     );
@@ -360,8 +366,8 @@ public class MainActivity extends Activity {
 
                 recorder.startRecording();
 
-                if (recorder.getRecordingState()
-                    != AudioRecord.RECORDSTATE_RECORDING) {
+                if (recorder.getRecordingState() !=
+                    AudioRecord.RECORDSTATE_RECORDING) {
                     throw new IllegalStateException(
                         "Mikrofon yazmağa başlamadı."
                     );
@@ -438,9 +444,14 @@ public class MainActivity extends Activity {
                         short sample = 0;
 
                         if (i < n) {
-                            // Natural microphone passthrough without
-                            // nonlinear limiting or artificial gain.
-                            sample = mono[i];
+                            // Mikrofon səsini 3 dəfə gücləndir.
+                            // Daşmanın qarşısını al.
+                            float boosted = mono[i] * 3.0f;
+
+                            sample = (short) Math.max(
+                                -32768,
+                                Math.min(32767, boosted)
+                            );
                         }
 
                         stereo[2 * i] = sample;
@@ -500,14 +511,13 @@ public class MainActivity extends Activity {
 
         } catch (Exception e) {
             Log.e(TAG, "Audio error", e);
-
             result = "XƏTA: " + e.getMessage();
 
         } finally {
             if (recorder != null) {
                 try {
-                    if (recorder.getRecordingState()
-                        == AudioRecord.RECORDSTATE_RECORDING) {
+                    if (recorder.getRecordingState() ==
+                        AudioRecord.RECORDSTATE_RECORDING) {
                         recorder.stop();
                     }
                 } catch (Exception ignored) {}
@@ -531,7 +541,6 @@ public class MainActivity extends Activity {
             }
 
             running = false;
-
             show(result);
 
             handler.post(() -> {
