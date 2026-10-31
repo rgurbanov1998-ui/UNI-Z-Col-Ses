@@ -1,0 +1,6 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'az.uniz.colses'
+    compileSdk 34
+    defaultConfig { applicationId 'az.uniz.colses'; minSdk 26; targetSdk 30; versionCode 1; versionName '0.1-test' }
+}
